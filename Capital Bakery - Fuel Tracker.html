@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Capital Bakery - Fuel Tracker</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="CB Fuel Log" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f5f7; min-height: 100vh; color: #1a1a1a; }
+  .header { background: #185FA5; color: white; padding: 14px 20px; text-align: center; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header p { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+  .tab-bar { display: flex; background: white; border-bottom: 1px solid #e0e0e0; position: sticky; top: 58px; z-index: 99; }
+  .tab { flex: 1; padding: 11px 6px; text-align: center; font-size: 13px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab.active { color: #185FA5; border-bottom-color: #185FA5; font-weight: 600; }
+  .content { max-width: 540px; margin: 0 auto; padding: 14px; }
+  .card { background: white; border-radius: 12px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #1a1a1a; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; font-weight: 500; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 15px; color: #1a1a1a; background: white; -webkit-appearance: none; }
+  .field textarea { height: 70px; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  .field input.auto-filled { background: #f8f9fa; color: #666; border-style: dashed; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .auto-hint { font-size: 12px; color: #2e7d32; margin-top: 4px; display: none; }
+  .auto-hint.show { display: block; }
+  .new-truck-note { font-size: 12px; color: #888; margin-top: 4px; display: none; }
+  .new-truck-note.show { display: block; }
+  .divider { border: none; border-top: 1px solid #f0f0f0; margin: 14px 0; }
+  .calc-box { background: #f0f6ff; border-radius: 10px; padding: 14px; margin-bottom: 14px; border: 1px solid #cce0f5; }
+  .calc-box-title { font-size: 12px; color: #555; margin-bottom: 10px; font-weight: 500; }
+  .calc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; }
+  .calc-val { font-size: 19px; font-weight: 700; color: #185FA5; }
+  .calc-val.muted { color: #bbb; }
+  .calc-val.good { color: #2e7d32; }
+  .calc-val.warn { color: #e65100; }
+  .calc-label { font-size: 11px; color: #888; margin-top: 2px; }
+  .seg-btns { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; margin-bottom: 14px; }
+  .seg-btn { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 500; cursor: pointer; background: white; color: #888; border: none; transition: all 0.15s; }
+  .seg-btn.active { background: #185FA5; color: white; }
+  .seg-btn.green.active { background: #2e7d32; }
+  .seg-btn.orange.active { background: #e65100; }
+  .fuel-type-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+  .fuel-btn { flex: 1; padding: 10px; border-radius: 8px; border: 2px solid #ddd; background: white; font-size: 14px; font-weight: 500; cursor: pointer; text-align: center; }
+  .fuel-btn.diesel.active { border-color: #1565c0; background: #e3f2fd; color: #1565c0; }
+  .fuel-btn.petrol.active { border-color: #2e7d32; background: #e8f5e9; color: #2e7d32; }
+  .meter-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 12px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082; }
+  .meter-toggle input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+  .meter-toggle label { font-size: 13px; color: #795548; cursor: pointer; margin: 0; font-weight: 500; }
+  .hidden { display: none !important; }
+  .btn-submit { width: 100%; padding: 13px; background: #185FA5; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+  .btn-submit:active { opacity: 0.85; }
+  .btn-submit:disabled { background: #aaa; cursor: not-allowed; }
+  .btn-green { background: #2e7d32; }
+  .btn-orange { background: #e65100; }
+  .success-msg { display: none; background: #e8f5e9; color: #2e7d32; border-radius: 10px; padding: 12px 16px; font-size: 14px; margin-bottom: 14px; text-align: center; border: 1px solid #c8e6c9; }
+  .error-toast { display: none; background: #ffebee; color: #c62828; border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; border: 1px solid #ffcdd2; }
+
+  /* RESERVE BALANCE BOX */
+  .bal-box { border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .bal-box.diesel { background: #e3f2fd; border: 1px solid #90caf9; }
+  .bal-box.petrol { background: #e8f5e9; border: 1px solid #a5d6a7; }
+  .bal-header { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .bal-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; }
+  .bal-val { font-size: 20px; font-weight: 700; }
+  .bal-val.diesel { color: #1565c0; }
+  .bal-val.petrol { color: #2e7d32; }
+  .bal-val.out { color: #e65100; }
+  .bal-val.balance { color: #185FA5; }
+  .bal-label { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* ADMIN */
+  .lock-screen { text-align: center; padding: 2rem 1rem; }
+  .lock-icon { font-size: 44px; margin-bottom: 1rem; }
+  .lock-screen h3 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .lock-screen p { font-size: 14px; color: #888; margin-bottom: 20px; }
+  .lock-input { padding: 11px 14px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; width: 100%; max-width: 220px; text-align: center; letter-spacing: 0.15em; margin-bottom: 12px; }
+  .lock-input:focus { outline: none; border-color: #185FA5; }
+  .btn-unlock { padding: 11px 36px; background: #185FA5; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .lock-error { display: none; color: #c62828; font-size: 13px; margin-bottom: 10px; }
+  .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .admin-title { font-size: 17px; font-weight: 600; }
+  .btn-logout { padding: 7px 12px; border-radius: 8px; border: 1px solid #ddd; background: white; color: #666; font-size: 13px; cursor: pointer; }
+  .btn-exp { padding: 8px 14px; border-radius: 8px; border: 1px solid #ddd; background: white; color: #333; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+  .btn-generate { padding: 10px 20px; background: #185FA5; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .export-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .summary-box { background: #f0f6ff; border-radius: 10px; padding: 14px; margin-bottom: 14px; border: 1px solid #cce0f5; }
+  .summary-title { font-size: 12px; color: #555; margin-bottom: 10px; font-weight: 500; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .sum-item { text-align: center; }
+  .sum-val { font-size: 17px; font-weight: 700; color: #185FA5; }
+  .sum-label { font-size: 11px; color: #888; margin-top: 2px; }
+  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .quick-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .btn-quick { padding: 7px 12px; border-radius: 8px; border: 1px solid #ddd; background: white; color: #555; font-size: 13px; cursor: pointer; }
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+  th { text-align: left; padding: 9px 8px; border-bottom: 2px solid #e0e0e0; color: #555; font-weight: 600; white-space: nowrap; }
+  td { padding: 9px 8px; border-bottom: 1px solid #f0f0f0; color: #333; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .tbl-foot td { background: #f0f6ff; font-weight: 700; color: #185FA5; border-top: 2px solid #cce0f5; }
+  .empty { text-align: center; color: #aaa; padding: 2rem; font-size: 14px; }
+  .report-section { display: none; }
+  .report-section.show { display: block; }
+  .spinner { display: none; font-size: 13px; color: #888; padding: 6px 0; }
+  .badge-diesel { background: #e3f2fd; color: #1565c0; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-petrol { background: #e8f5e9; color: #2e7d32; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-in { background: #e8f5e9; color: #2e7d32; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-out { background: #fff3e0; color: #e65100; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .btn-edit { padding: 4px 10px; border-radius: 6px; border: 1px solid #185FA5; background: white; color: #185FA5; font-size: 12px; cursor: pointer; }
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; justify-content: center; align-items: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: white; border-radius: 14px; padding: 20px; width: 92%; max-width: 420px; max-height: 85vh; overflow-y: auto; }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .btn-cancel { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white; color: #666; font-size: 14px; cursor: pointer; }
+  .btn-save-edit { flex: 2; padding: 10px; border-radius: 8px; border: none; background: #185FA5; color: white; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .stock-box { background: white; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .stock-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #1a1a1a; }
+  .stock-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .stock-item { border-radius: 10px; padding: 12px; }
+  .diesel-box { background: #e3f2fd; border: 1px solid #90caf9; }
+  .petrol-box { background: #e8f5e9; border: 1px solid #a5d6a7; }
+  .stock-label { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .stock-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .balance-row { border-top: 1px solid rgba(0,0,0,0.1); margin-top: 6px; padding-top: 6px; }
+  .stock-sub { font-size: 11px; color: #666; }
+  .stock-val { font-size: 13px; font-weight: 700; }
+  .stock-val.diesel { color: #1565c0; }
+  .stock-val.petrol { color: #2e7d32; }
+  .stock-val.out { color: #e65100; }
+  .stock-val.balance { color: #185FA5; font-size: 15px; }
+  .btn-add-stock { width: 100%; padding: 10px; background: #185FA5; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-add-stock:active { opacity: 0.85; }
+  @media (max-width: 400px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .row2 { grid-template-columns: 1fr; }
+    .filter-row { grid-template-columns: 1fr; }
+    .bal-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="header"><h1>🚛 Capital Bakery</h1><p>Fleet Fuel Tracker</p></div>
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('driver')" id="tab-btn-driver">🚚 Trucks</div>
+  <div class="tab" onclick="switchTab('reserve')" id="tab-btn-reserve">🛢️ Reserve</div>
+  <div class="tab" onclick="switchTab('admin')" id="tab-btn-admin">🔒 Admin</div>
+</div>
+
+<!-- ===== TRUCKS TAB ===== -->
+<div id="tab-driver" class="content">
+  <div class="success-msg" id="success-msg">✅ Entry saved! See you tomorrow.</div>
+  <div class="error-toast" id="error-toast"></div>
+  <div class="card">
+    <div class="card-title">Daily Fuel Log</div>
+    <div class="field" id="fuel-type-field" style="display:none;">
+      <label>Fuel Type <span style="font-size:11px;color:#e65100;">⚠️ Unknown truck — please select</span></label>
+      <div class="fuel-type-btns">
+        <button class="fuel-btn diesel active" id="btn-diesel" onclick="setFuelType('Diesel')">⛽ Diesel</button>
+        <button class="fuel-btn petrol" id="btn-petrol" onclick="setFuelType('Petrol')">🟢 Petrol</button>
+      </div>
+    </div>
+    <div class="field" id="fuel-type-auto" style="display:none;">
+      <label>Fuel Type</label>
+      <div id="fuel-auto-badge" style="padding:10px 14px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block;"></div>
+    </div>
+    <div class="field"><label>Truck Number</label><input type="text" id="d-truck" placeholder="e.g. TRK-012" oninput="onTruckChange()" autocomplete="off" style="font-size:18px;font-weight:600;" /></div>
+    <div class="field"><label>Date</label><input type="date" id="d-date" /></div>
+    <div class="meter-toggle">
+      <input type="checkbox" id="meter-broken" onchange="toggleMeter()" />
+      <label for="meter-broken">⚠️ Mileage meter not working</label>
+    </div>
+    <div id="mileage-section">
+      <hr class="divider" />
+      <div class="field">
+        <label>⬅️ Previous Mileage (km)</label>
+        <input type="number" id="d-prev" readonly class="auto-filled" placeholder="Auto-filled" />
+        <div class="auto-hint" id="prev-hint">✓ Auto-filled from last entry</div>
+        <div class="new-truck-note" id="new-truck-note">ℹ️ First entry for this truck.</div>
+      </div>
+      <div class="field"><label>➡️ Current Mileage (km)</label><input type="number" id="d-curr" placeholder="Enter today's mileage" min="0" oninput="recalc()" /></div>
+    </div>
+    <div class="field"><label>⛽ Litres Fuelled Today</label><input type="number" id="d-litres" placeholder="e.g. 120" min="0" oninput="recalc()" /></div>
+    <div class="calc-box" id="calc-box">
+      <div class="calc-box-title">🧮 Auto Calculated</div>
+      <div class="calc-grid">
+        <div><div class="calc-val muted" id="c-km">—</div><div class="calc-label">km today</div></div>
+        <div><div class="calc-val muted" id="c-kpl">—</div><div class="calc-label">km/litre</div></div>
+        <div><div class="calc-val muted" id="c-lp100">—</div><div class="calc-label">L/100km</div></div>
+      </div>
+    </div>
+    <div id="truck-alert-box" class="hidden" style="border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;font-weight:500;"></div>
+    <div class="spinner" id="submit-spinner">⏳ Saving...</div>
+    <button class="btn-submit" id="btn-submit" onclick="submitEntry()">💾 Save Fuel Entry</button>
+  </div>
+</div>
+
+<!-- ===== RESERVE TAB ===== -->
+<div id="tab-reserve" class="content" style="display:none;">
+  <div class="success-msg" id="r-success-msg">✅ Reserve entry saved!</div>
+  <div class="error-toast" id="r-error-toast"></div>
+
+  <!-- LIVE BALANCE -->
+  <div class="bal-box diesel">
+    <div class="bal-header" style="color:#1565c0;">⛽ Diesel Reserve Tank</div>
+    <div class="bal-grid">
+      <div><div class="bal-val diesel" id="rb-d-received">— L</div><div class="bal-label">Total Received</div></div>
+      <div><div class="bal-val out" id="rb-d-out">— L</div><div class="bal-label">Total Out</div></div>
+      <div><div class="bal-val balance" id="rb-d-balance">— L</div><div class="bal-label">Current Balance</div></div>
+    </div>
+  </div>
+  <div class="bal-box petrol">
+    <div class="bal-header" style="color:#2e7d32;">🟢 Petrol Reserve Tank</div>
+    <div class="bal-grid">
+      <div><div class="bal-val petrol" id="rb-p-received">— L</div><div class="bal-label">Total Received</div></div>
+      <div><div class="bal-val out" id="rb-p-out">— L</div><div class="bal-label">Total Out</div></div>
+      <div><div class="bal-val balance" id="rb-p-balance">— L</div><div class="bal-label">Current Balance</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Reserve Tank Entry</div>
+
+    <!-- RECEIVE or OUT -->
+    <div class="field">
+      <label>Transaction Type</label>
+      <div class="seg-btns">
+        <button class="seg-btn green active" id="seg-receive" onclick="setTxType('Receive')">📥 Receive</button>
+        <button class="seg-btn orange" id="seg-out" onclick="setTxType('Out')">📤 Out</button>
+      </div>
+    </div>
+
+    <!-- FUEL TYPE -->
+    <div class="field">
+      <label>Fuel Type</label>
+      <div class="fuel-type-btns">
+        <button class="fuel-btn diesel active" id="r-btn-diesel" onclick="setReserveFuelType('Diesel')">⛽ Diesel</button>
+        <button class="fuel-btn petrol" id="r-btn-petrol" onclick="setReserveFuelType('Petrol')">🟢 Petrol</button>
+      </div>
+    </div>
+
+    <!-- OUT DESTINATION (shown only when Out selected) -->
+    <div id="out-dest-section" class="hidden">
+      <div class="field">
+        <label>Out To</label>
+        <div class="seg-btns">
+          <button class="seg-btn active" id="dest-depot" onclick="setDest('Depot')">🏭 Depot</button>
+          <button class="seg-btn" id="dest-gen" onclick="setDest('Generator')">⚡ Generator</button>
+        </div>
+      </div>
+      <div class="field" id="depot-select-field">
+        <label>Depot Name</label>
+        <select id="r-depot">
+          <option value="">Select depot...</option>
+          <option value="Kasungu">Kasungu</option>
+          <option value="Salima">Salima</option>
+          <option value="Ntcheu">Ntcheu</option>
+          <option value="Mchinji">Mchinji</option>
+          <option value="Mponela">Mponela</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field hidden" id="depot-other-field">
+        <label>Other — Description</label>
+        <textarea id="r-other-desc" placeholder="Describe the reason..."></textarea>
+      </div>
+      <div class="field hidden" id="gen-select-field">
+        <label>Generator</label>
+        <select id="r-gen">
+          <option value="">Select generator...</option>
+          <option value="800 KVA Generator">800 KVA Generator</option>
+          <option value="100 KVA Generator">100 KVA Generator</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field"><label>Date</label><input type="date" id="r-date" /></div>
+    <div class="field"><label id="r-litres-label">📥 Litres Received</label><input type="number" id="r-litres" placeholder="e.g. 2000" min="0" /></div>
+    <div class="spinner" id="r-spinner">⏳ Saving...</div>
+    <button class="btn-submit btn-green" id="r-submit" onclick="submitReserve()">💾 Save Entry</button>
+  </div>
+</div>
+
+<!-- ===== ADMIN TAB ===== -->
+<div id="tab-admin" class="content" style="display:none;">
+  <div class="card lock-screen" id="admin-lock">
+    <div class="lock-icon">🔐</div>
+    <h3>Admin Access Only</h3>
+    <p>Enter your password</p>
+    <div class="lock-error" id="lock-error">❌ Incorrect password.</div>
+    <input type="password" class="lock-input" id="lock-pass" placeholder="Password" onkeydown="if(event.key==='Enter')unlock()" /><br/>
+    <button class="btn-unlock" onclick="unlock()">Enter Dashboard</button>
+  </div>
+
+  <div id="admin-dash" style="display:none;">
+    <div class="admin-header">
+      <div class="admin-title">📊 Admin Dashboard</div>
+      <button class="btn-logout" onclick="logout()">🔒 Lock</button>
+    </div>
+
+    <!-- MAIN FUEL STOCK -->
+    <div class="stock-box">
+      <div class="stock-title">⛽ Main Fuel Stock</div>
+      <div class="stock-grid">
+        <div class="stock-item diesel-box">
+          <div class="stock-label">🔵 Diesel</div>
+          <div class="stock-row"><span class="stock-sub">Received</span><span class="stock-val diesel" id="ms-d-received">— L</span></div>
+          <div class="stock-row"><span class="stock-sub">Trucks Out</span><span class="stock-val out" id="ms-d-trucks">— L</span></div>
+          <div class="stock-row"><span class="stock-sub">Reserve Out</span><span class="stock-val out" id="ms-d-reserve">— L</span></div>
+          <div class="stock-row balance-row"><span class="stock-sub">Balance</span><span class="stock-val balance" id="ms-d-balance">— L</span></div>
+        </div>
+        <div class="stock-item petrol-box">
+          <div class="stock-label">🟢 Petrol</div>
+          <div class="stock-row"><span class="stock-sub">Received</span><span class="stock-val petrol" id="ms-p-received">— L</span></div>
+          <div class="stock-row"><span class="stock-sub">Trucks Out</span><span class="stock-val out" id="ms-p-trucks">— L</span></div>
+          <div class="stock-row"><span class="stock-sub">Reserve Out</span><span class="stock-val out" id="ms-p-reserve">— L</span></div>
+          <div class="stock-row balance-row"><span class="stock-sub">Balance</span><span class="stock-val balance" id="ms-p-balance">— L</span></div>
+        </div>
+      </div>
+      <button class="btn-add-stock" onclick="openStockModal()">➕ Add Fuel Received from Supplier</button>
+    </div>
+
+    <!-- REPORT TYPE -->
+    <div class="card">
+      <div class="card-title">Report Type</div>
+      <div class="seg-btns">
+        <button class="seg-btn active" id="rtype-trucks" onclick="setReportType('trucks')">🚚 Trucks</button>
+        <button class="seg-btn" id="rtype-reserve" onclick="setReportType('reserve')">🛢️ Reserve Tank</button>
+        <button class="seg-btn" id="rtype-stock" onclick="setReportType('stock')">⛽ Fuel Stock</button>
+      </div>
+    </div>
+
+    <!-- TRUCK FILTERS -->
+    <div class="card" id="truck-filters">
+      <div class="card-title">Truck Report Filters</div>
+      <div class="filter-row">
+        <div class="field" style="margin-bottom:8px;"><label>Truck Number</label><select id="f-truck"><option value="">All Trucks</option></select></div>
+        <div class="field" style="margin-bottom:8px;"><label>Fuel Type</label><select id="f-fueltype"><option value="">All</option><option>Diesel</option><option>Petrol</option></select></div>
+      </div>
+      <div class="filter-row">
+        <div class="field" style="margin-bottom:8px;"><label>From Date</label><input type="date" id="f-from" /></div>
+        <div class="field" style="margin-bottom:8px;"><label>To Date</label><input type="date" id="f-to" /></div>
+      </div>
+      <div class="quick-btns">
+        <button class="btn-quick" onclick="setMonth('f-from','f-to',0)">📅 This Month</button>
+        <button class="btn-quick" onclick="setMonth('f-from','f-to',-1)">📅 Last Month</button>
+        <button class="btn-quick" onclick="clearTruckFilters()">✕ Clear</button>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn-generate" onclick="generateTruckReport()">📈 Generate Report</button>
+        <div class="spinner" id="load-spinner">⏳ Loading...</div>
+      </div>
+    </div>
+
+    <!-- RESERVE FILTERS -->
+    <div class="card hidden" id="reserve-filters">
+      <div class="card-title">Reserve Tank Report Filters</div>
+      <div class="filter-row">
+        <div class="field" style="margin-bottom:8px;"><label>Fuel Type</label><select id="rf-fueltype"><option value="">All</option><option>Diesel</option><option>Petrol</option></select></div>
+        <div class="field" style="margin-bottom:8px;"><label>Transaction</label><select id="rf-tx"><option value="">All</option><option value="Receive">Receive</option><option value="Out">Out</option></select></div>
+      </div>
+      <div class="filter-row">
+        <div class="field" style="margin-bottom:8px;"><label>Depot / Generator</label><select id="rf-dest"><option value="">All</option><option value="Kasungu">Kasungu</option><option value="Salima">Salima</option><option value="Ntcheu">Ntcheu</option><option value="Mchinji">Mchinji</option><option value="Mponela">Mponela</option><option value="800 KVA Generator">800 KVA Generator</option><option value="100 KVA Generator">100 KVA Generator</option><option value="Other">Other</option></select></div>
+        <div class="field" style="margin-bottom:8px;"></div>
+      </div>
+      <div class="filter-row">
+        <div class="field" style="margin-bottom:8px;"><label>From Date</label><input type="date" id="rf-from" /></div>
+        <div class="field" style="margin-bottom:8px;"><label>To Date</label><input type="date" id="rf-to" /></div>
+      </div>
+      <div class="quick-btns">
+        <button class="btn-quick" onclick="setMonth('rf-from','rf-to',0)">📅 This Month</button>
+        <button class="btn-quick" onclick="setMonth('rf-from','rf-to',-1)">📅 Last Month</button>
+        <button class="btn-quick" onclick="clearReserveFilters()">✕ Clear</button>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn-generate" onclick="generateReserveReport()">📈 Generate Report</button>
+        <div class="spinner" id="rload-spinner">⏳ Loading...</div>
+      </div>
+    </div>
+
+
+    <!-- STOCK FILTERS -->
+    <div class="card hidden" id="stock-filters">
+      <div class="card-title">Fuel Stock Report</div>
+      <div class="filter-row">
+        <div class="field" style="margin-bottom:8px;"><label>Fuel Type</label><select id="sf-fueltype"><option value="">All (Diesel + Petrol)</option><option>Diesel</option><option>Petrol</option></select></div>
+        <div class="field" style="margin-bottom:8px;"></div>
+      </div>
+      <div class="filter-row">
+        <div class="field" style="margin-bottom:8px;"><label>From Date</label><input type="date" id="sf-from" /></div>
+        <div class="field" style="margin-bottom:8px;"><label>To Date</label><input type="date" id="sf-to" /></div>
+      </div>
+      <div class="quick-btns">
+        <button class="btn-quick" onclick="setMonth('sf-from','sf-to',0)">📅 This Month</button>
+        <button class="btn-quick" onclick="setMonth('sf-from','sf-to',-1)">📅 Last Month</button>
+        <button class="btn-quick" onclick="clearStockFilters()">✕ Clear</button>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn-generate" onclick="generateStockReport()">📈 Generate Report</button>
+        <div class="spinner" id="sload-spinner">⏳ Loading...</div>
+      </div>
+    </div>
+
+    <!-- STOCK REPORT OUTPUT -->
+    <div class="report-section" id="stock-report-section">
+      <div class="summary-box">
+        <div class="summary-title" id="s-report-label"></div>
+        <div class="summary-grid">
+          <div class="sum-item"><div class="sum-val" id="sr-entries">0</div><div class="sum-label">Entries</div></div>
+          <div class="sum-item"><div class="sum-val" id="sr-received">0 L</div><div class="sum-label">Total Received</div></div>
+          <div class="sum-item"><div class="sum-val" id="sr-out">0 L</div><div class="sum-label">Total Out</div></div>
+          <div class="sum-item"><div class="sum-val" id="sr-balance">— L</div><div class="sum-label">Balance</div></div>
+        </div>
+      </div>
+      <div class="export-bar">
+        <span style="font-size:13px;color:#888;">Export:</span>
+        <button class="btn-exp" onclick="exportStockCSV()">📊 Excel/CSV</button>
+        <button class="btn-exp" onclick="exportStockPDF()">📄 PDF</button>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Fuel</th><th>Type</th><th>Details</th><th>Litres</th></tr></thead>
+            <tbody id="s-tbl-body"></tbody>
+          </table>
+          <div class="empty" id="s-tbl-empty" style="display:none;">No entries match.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRUCK REPORT OUTPUT -->
+    <div class="report-section" id="report-section">
+      <div class="summary-box">
+        <div class="summary-title" id="report-label"></div>
+        <div class="summary-grid">
+          <div class="sum-item"><div class="sum-val" id="r-entries">0</div><div class="sum-label">Entries</div></div>
+          <div class="sum-item"><div class="sum-val" id="r-litres">0 L</div><div class="sum-label">Total Litres</div></div>
+          <div class="sum-item"><div class="sum-val" id="r-km">0 km</div><div class="sum-label">Total km</div></div>
+          <div class="sum-item"><div class="sum-val" id="r-avg">—</div><div class="sum-label">Avg km/L</div></div>
+        </div>
+      </div>
+      <div class="export-bar">
+        <span style="font-size:13px;color:#888;">Export:</span>
+        <button class="btn-exp" onclick="exportTruckCSV()">📊 Excel/CSV</button>
+        <button class="btn-exp" onclick="exportTruckPDF()">📄 PDF</button>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Truck</th><th>Fuel</th><th>Prev km</th><th>Curr km</th><th>Travelled</th><th>Litres</th><th>km/L</th><th>Edit</th></tr></thead>
+            <tbody id="tbl-body"></tbody>
+          </table>
+          <div class="empty" id="tbl-empty" style="display:none;">No entries match.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESERVE REPORT OUTPUT -->
+    <div class="report-section" id="reserve-report-section">
+      <div class="summary-box">
+        <div class="summary-title" id="r-report-label"></div>
+        <div class="summary-grid">
+          <div class="sum-item"><div class="sum-val" id="rr-entries">0</div><div class="sum-label">Entries</div></div>
+          <div class="sum-item"><div class="sum-val" id="rr-received">0 L</div><div class="sum-label" id="rr-received-label">Total Received</div></div>
+          <div class="sum-item"><div class="sum-val" id="rr-out">0 L</div><div class="sum-label" id="rr-out-label">Total Out</div></div>
+          <div class="sum-item"><div class="sum-val" id="rr-balance">— L</div><div class="sum-label" id="rr-balance-label">Balance</div></div>
+        </div>
+      </div>
+      <div class="export-bar">
+        <span style="font-size:13px;color:#888;">Export:</span>
+        <button class="btn-exp" onclick="exportReserveCSV()">📊 Excel/CSV</button>
+        <button class="btn-exp" onclick="exportReservePDF()">📄 PDF</button>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Fuel</th><th>Type</th><th>Destination</th><th>Litres</th><th>Edit</th></tr></thead>
+            <tbody id="r-tbl-body"></tbody>
+          </table>
+          <div class="empty" id="r-tbl-empty" style="display:none;">No entries match.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STOCK MODAL -->
+<div class="modal-overlay" id="stock-modal">
+  <div class="modal">
+    <div class="modal-title">➕ Add Fuel Received from Supplier</div>
+    <div class="field">
+      <label>Fuel Type</label>
+      <div class="fuel-type-btns">
+        <button class="fuel-btn diesel active" id="sm-btn-diesel" onclick="setStockFuelType('Diesel')">⛽ Diesel</button>
+        <button class="fuel-btn petrol" id="sm-btn-petrol" onclick="setStockFuelType('Petrol')">🟢 Petrol</button>
+      </div>
+    </div>
+    <div class="field"><label>Date Received</label><input type="date" id="sm-date" /></div>
+    <div class="field"><label>Litres Received</label><input type="number" id="sm-litres" placeholder="e.g. 10000" min="0" /></div>
+    <div class="field"><label>Supplier Name (optional)</label><input type="text" id="sm-supplier" placeholder="e.g. Total Malawi" /></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeStockModal()">Cancel</button>
+      <button class="btn-save-edit" onclick="saveStock()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">✏️ Edit Entry</div>
+    <div id="modal-fields"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save-edit" onclick="saveEdit()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script>
+
+
+// ===== TRUCK FUEL TYPE LOOKUP =====
+const DIESEL_TRUCKS = new Set(['BZ18973','NS5317','NS4340','NS8058','NS5320','NS3319','NS9700','NS6741','LA7403','NS8002','NS4339','NS6740','NS4338','NS9701','NS3986','NN6806','NS4483','NS3985','NS4199','SA504','SA6261','SA442','SA510','SA509','SA506','SA1451','SA1450','SA1201','SA251','SA1499','SA3235','SA6243','SA2718','BT11579','NS10430','BZ15409','BV5523','NS10392','BT14494','NS11036','NS11056','NS11773','NS11774','NS7970','BZ2053','SA8806','BK7681']);
+const PETROL_TRUCKS = new Set(['NS10506','NS8004','NS8005','SA3339','NS3317','NN635','DZ396','SA3018','MN6469','LL10905','DA10626','LL11420','SA8816','SA11363','KA4472']);
+
+function getTruckFuelType(truck) {
+  const t = truck.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (DIESEL_TRUCKS.has(t)) return 'Diesel';
+  if (PETROL_TRUCKS.has(t)) return 'Petrol';
+  return null; // Unknown truck
+}
+
+// ===== TRUCK KM/L AVERAGES =====
+const TRUCK_AVERAGES = {
+  'SA1499': 6.0, 'NS4199': 6.0, 'SA1201': 6.0, 'SA2718': 4.0,
+  'NS6741': 6.5, 'NS4338': 6.5, 'NS4339': 6.5, 'NS4340': 6.5, 'NS4483': 6.5,
+  'NS11036': 7.5, 'NS11056': 7.5, 'BT14494': 7.5
+};
+const ALERT_THRESHOLD = 5; // km/L difference to trigger alert
+
+function checkTruckAlert(truck, actualKpl) {
+  const expected = TRUCK_AVERAGES[truck.toUpperCase()];
+  if (!expected || !actualKpl) return null;
+  const diff = expected - actualKpl;
+  if (diff > ALERT_THRESHOLD) return { type: 'danger', msg: '🚨 Very high fuel consumption! Expected ' + expected + ' km/L but got ' + actualKpl.toFixed(1) + ' km/L' };
+  if (diff > 0.5) return { type: 'warn', msg: '⚠️ Below normal. Expected ' + expected + ' km/L, got ' + actualKpl.toFixed(1) + ' km/L' };
+  if (actualKpl > expected + 0.5) return { type: 'good', msg: '✅ Great efficiency! Expected ' + expected + ' km/L, got ' + actualKpl.toFixed(1) + ' km/L' };
+  return { type: 'ok', msg: '✅ Normal. Expected ' + expected + ' km/L, got ' + actualKpl.toFixed(1) + ' km/L' };
+}
+
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzw1MbzBsYXxfVMgWVAcCBXyKb4jsSlmQ1gYGYexj9GJcrybut7Vt7M6wQwFU5sb9YdKg/exec';
+const ADMIN_PASSWORD = 'cb1234';
+const DEPOTS = ['Kasungu','Salima','Ntcheu','Mchinji','Mponela'];
+const GENS = ['800 KVA Generator','100 KVA Generator'];
+
+let lastMileage = JSON.parse(localStorage.getItem('cb_lastMileage')||'{}');
+let selectedFuelType='Diesel', reserveFuelType='Diesel', txType='Receive', destType='Depot';
+let reportType='trucks', currentReport=[], allEntries=[], allReserve=[], currentReserveReport=[];
+let editRow=null, editType=null, truckLookupTimer=null;
+
+document.getElementById('d-date').value = new Date().toISOString().split('T')[0];
+document.getElementById('r-date').value = new Date().toISOString().split('T')[0];
+
+function switchTab(t) {
+  ['driver','reserve','admin'].forEach(x => {
+    document.getElementById('tab-'+x).style.display = x===t?'':'none';
+    document.getElementById('tab-btn-'+x).classList.toggle('active', x===t);
+  });
+  if (t==='reserve') loadReserveBalance();
+}
+
+// ===== FUEL TYPE =====
+function setFuelType(t) {
+  selectedFuelType=t;
+  document.getElementById('btn-diesel').classList.toggle('active',t==='Diesel');
+  document.getElementById('btn-petrol').classList.toggle('active',t==='Petrol');
+}
+function setReserveFuelType(t) {
+  reserveFuelType=t;
+  document.getElementById('r-btn-diesel').classList.toggle('active',t==='Diesel');
+  document.getElementById('r-btn-petrol').classList.toggle('active',t==='Petrol');
+}
+
+// ===== RESERVE TX TYPE =====
+function setTxType(t) {
+  txType=t;
+  document.getElementById('seg-receive').classList.toggle('active',t==='Receive');
+  document.getElementById('seg-receive').classList.toggle('green',t==='Receive');
+  document.getElementById('seg-out').classList.toggle('active',t==='Out');
+  document.getElementById('seg-out').classList.toggle('orange',t==='Out');
+  document.getElementById('out-dest-section').classList.toggle('hidden',t!=='Out');
+  document.getElementById('r-litres-label').textContent = t==='Receive' ? '📥 Litres Received' : '📤 Litres Out';
+  document.getElementById('r-submit').className = 'btn-submit ' + (t==='Receive'?'btn-green':'btn-orange');
+}
+
+function setDest(d) {
+  destType=d;
+  document.getElementById('dest-depot').classList.toggle('active',d==='Depot');
+  document.getElementById('dest-gen').classList.toggle('active',d==='Generator');
+  document.getElementById('depot-select-field').classList.toggle('hidden',d!=='Depot');
+  document.getElementById('gen-select-field').classList.toggle('hidden',d!=='Generator');
+  document.getElementById('depot-other-field').classList.add('hidden');
+}
+document.getElementById('r-depot').addEventListener('change',function(){
+  document.getElementById('depot-other-field').classList.toggle('hidden',this.value!=='Other');
+});
+
+// ===== METER TOGGLE =====
+function toggleMeter() {
+  const b=document.getElementById('meter-broken').checked;
+  document.getElementById('mileage-section').classList.toggle('hidden',b);
+  document.getElementById('calc-box').classList.toggle('hidden',b);
+  if(b){document.getElementById('d-prev').value='';document.getElementById('d-curr').value='';recalc();}
+}
+
+// ===== TRUCK MILEAGE =====
+function onTruckChange() {
+  const truck=document.getElementById('d-truck').value.trim().toUpperCase();
+  const pi=document.getElementById('d-prev'), hint=document.getElementById('prev-hint'), note=document.getElementById('new-truck-note');
+  if(!truck){
+    pi.value='';hint.classList.remove('show');note.classList.remove('show');
+    document.getElementById('fuel-type-field').style.display='none';
+    document.getElementById('fuel-type-auto').style.display='none';
+    recalc();return;
+  }
+  if(lastMileage[truck]!==undefined){pi.value=lastMileage[truck];hint.textContent='✓ Auto-filled from last entry';hint.classList.add('show');note.classList.remove('show');recalc();}
+  // Auto fuel type
+  const autoFuel = getTruckFuelType(truck);
+  if (autoFuel) {
+    selectedFuelType = autoFuel;
+    document.getElementById('fuel-type-field').style.display = 'none';
+    document.getElementById('fuel-type-auto').style.display = '';
+    const badge = document.getElementById('fuel-auto-badge');
+    badge.textContent = autoFuel === 'Diesel' ? '⛽ Diesel' : '🟢 Petrol';
+    badge.style.background = autoFuel === 'Diesel' ? '#e3f2fd' : '#e8f5e9';
+    badge.style.color = autoFuel === 'Diesel' ? '#1565c0' : '#2e7d32';
+    badge.style.border = autoFuel === 'Diesel' ? '2px solid #1565c0' : '2px solid #2e7d32';
+  } else if (truck) {
+    document.getElementById('fuel-type-field').style.display = '';
+    document.getElementById('fuel-type-auto').style.display = 'none';
+  }
+
+  clearTimeout(truckLookupTimer);
+  truckLookupTimer=setTimeout(()=>{
+    hint.textContent='🔄 Checking Google Sheet...';hint.classList.add('show');
+    const cb='ml_'+Date.now(), sc=document.createElement('script');
+    sc.src=SCRIPT_URL+'?action=getLastMileage&truck='+encodeURIComponent(truck)+'&callback='+cb;
+    sc.onerror=()=>{try{document.body.removeChild(sc);}catch(e){}};
+    window[cb]=function(data){
+      delete window[cb];try{document.body.removeChild(sc);}catch(e){}
+      if(data.mileage!==null&&data.mileage!==undefined&&data.mileage!==''){
+        pi.value=data.mileage;lastMileage[truck]=data.mileage;localStorage.setItem('cb_lastMileage',JSON.stringify(lastMileage));
+        hint.textContent='✓ Auto-filled from Google Sheet';hint.classList.add('show');note.classList.remove('show');recalc();
+      }else{pi.value='';hint.classList.remove('show');note.classList.add('show');recalc();}
+    };
+    document.body.appendChild(sc);
+  },1000);
+}
+
+function recalc() {
+  const prev=parseFloat(document.getElementById('d-prev').value),curr=parseFloat(document.getElementById('d-curr').value),litres=parseFloat(document.getElementById('d-litres').value);
+  const ke=document.getElementById('c-km'),kpe=document.getElementById('c-kpl'),lpe=document.getElementById('c-lp100');
+  if(!prev||!curr||curr<=prev){ke.textContent=kpe.textContent=lpe.textContent='—';ke.className=kpe.className=lpe.className='calc-val muted';return;}
+  const km=curr-prev;ke.textContent=km.toLocaleString()+' km';ke.className='calc-val';
+  if(litres>0){
+    const kpl=km/litres,lp100=(litres/km)*100;
+    kpe.textContent=kpl.toFixed(1);kpe.className='calc-val '+(kpl>=4?'good':'warn');
+    lpe.textContent=lp100.toFixed(1)+' L';lpe.className='calc-val '+(lp100<=25?'good':'warn');
+    // Show truck alert
+    const truck=document.getElementById('d-truck').value.trim().toUpperCase();
+    const alert=checkTruckAlert(truck,kpl);
+    const alertBox=document.getElementById('truck-alert-box');
+    if(alert){
+      alertBox.textContent=alert.msg;
+      alertBox.className='';
+      alertBox.style.display='block';
+      if(alert.type==='danger'){alertBox.style.background='#ffebee';alertBox.style.color='#c62828';alertBox.style.border='1px solid #ffcdd2';}
+      else if(alert.type==='warn'){alertBox.style.background='#fff8e1';alertBox.style.color='#e65100';alertBox.style.border='1px solid #ffe082';}
+      else{alertBox.style.background='#e8f5e9';alertBox.style.color='#2e7d32';alertBox.style.border='1px solid #c8e6c9';}
+    } else { alertBox.style.display='none'; alertBox.className='hidden'; }
+  }
+}
+
+// ===== SUBMIT TRUCK =====
+async function submitEntry() {
+  const truck=document.getElementById('d-truck').value.trim().toUpperCase();
+  const prev=parseFloat(document.getElementById('d-prev').value),curr=parseFloat(document.getElementById('d-curr').value);
+  const litres=parseFloat(document.getElementById('d-litres').value),date=document.getElementById('d-date').value;
+  const broken=document.getElementById('meter-broken').checked;
+  if(!truck||!litres||!date){alert('Please fill in all fields.');return;}
+  const km=!broken&&prev&&curr>prev?curr-prev:null;
+  const kpl=km?parseFloat((km/litres).toFixed(2)):null,lp100=km?parseFloat(((litres/km)*100).toFixed(2)):null;
+  document.getElementById('btn-submit').disabled=true;document.getElementById('submit-spinner').style.display='block';
+  try{
+    await fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet:'trucks',date,name:'',truck,fuelType:selectedFuelType,prev:(!broken&&prev)?prev:null,curr:(!broken&&curr)?curr:null,km,litres,kpl,lp100,meterBroken:broken})});
+    if(!broken&&curr){lastMileage[truck]=curr;localStorage.setItem('cb_lastMileage',JSON.stringify(lastMileage));}
+    document.getElementById('success-msg').style.display='block';setTimeout(()=>document.getElementById('success-msg').style.display='none',4000);
+    document.getElementById('d-truck').value='';
+    document.getElementById('d-curr').value='';document.getElementById('d-litres').value='';
+    document.getElementById('d-prev').value='';
+    document.getElementById('meter-broken').checked=false;
+    document.getElementById('prev-hint').classList.remove('show');
+    document.getElementById('new-truck-note').classList.remove('show');
+    document.getElementById('truck-alert-box').style.display='none';
+    document.getElementById('fuel-type-field').style.display='none';
+    document.getElementById('fuel-type-auto').style.display='none';
+    toggleMeter();recalc();
+  }catch(err){const et=document.getElementById('error-toast');et.textContent='❌ Could not save. Check internet.';et.style.display='block';}
+  document.getElementById('btn-submit').disabled=false;document.getElementById('submit-spinner').style.display='none';
+}
+
+// ===== SUBMIT RESERVE =====
+async function submitReserve() {
+  const date=document.getElementById('r-date').value,litres=parseFloat(document.getElementById('r-litres').value);
+  if(!date||!litres){alert('Please enter date and litres.');return;}
+  let destination='', details='';
+  if(txType==='Out'){
+    if(destType==='Depot'){
+      destination=document.getElementById('r-depot').value;
+      if(!destination){alert('Please select a depot.');return;}
+      if(destination==='Other'){details=document.getElementById('r-other-desc').value.trim()||'Other';}
+      else{details=destination;}
+    } else {
+      destination=document.getElementById('r-gen').value;
+      if(!destination){alert('Please select a generator.');return;}
+      details=destination;
+    }
+  } else { details='Received'; }
+  const payload={sheet:'reserve',date,fuelType:reserveFuelType,txType,destination:details,litres};
+  document.getElementById('r-submit').disabled=true;document.getElementById('r-spinner').style.display='block';
+  try{
+    await fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    document.getElementById('r-success-msg').style.display='block';setTimeout(()=>document.getElementById('r-success-msg').style.display='none',4000);
+    document.getElementById('r-litres').value='';
+    document.getElementById('r-depot').value='';document.getElementById('r-gen').value='';
+    document.getElementById('r-other-desc').value='';
+    setTimeout(loadReserveBalance,1500);
+  }catch(err){const et=document.getElementById('r-error-toast');et.textContent='❌ Could not save.';et.style.display='block';}
+  document.getElementById('r-submit').disabled=false;document.getElementById('r-spinner').style.display='none';
+}
+
+// ===== RESERVE BALANCE =====
+function loadReserveBalance() {
+  const cb='rb_'+Date.now(),sc=document.createElement('script');
+  sc.src=SCRIPT_URL+'?action=getReserveBalance&callback='+cb;
+  window[cb]=function(data){
+    delete window[cb];try{document.body.removeChild(sc);}catch(e){}
+    document.getElementById('rb-d-received').textContent=(data.dReceived||0).toLocaleString()+' L';
+    document.getElementById('rb-d-out').textContent=(data.dOut||0).toLocaleString()+' L';
+    document.getElementById('rb-d-balance').textContent=(data.dBalance||0).toLocaleString()+' L';
+    document.getElementById('rb-p-received').textContent=(data.pReceived||0).toLocaleString()+' L';
+    document.getElementById('rb-p-out').textContent=(data.pOut||0).toLocaleString()+' L';
+    document.getElementById('rb-p-balance').textContent=(data.pBalance||0).toLocaleString()+' L';
+  };
+  sc.onerror=()=>{try{document.body.removeChild(sc);}catch(e){}};
+  document.body.appendChild(sc);
+}
+loadReserveBalance();
+
+// ===== ADMIN =====
+function unlock(){
+  if(document.getElementById('lock-pass').value===ADMIN_PASSWORD){
+    document.getElementById('admin-lock').style.display='none';document.getElementById('admin-dash').style.display='';
+    document.getElementById('tab-btn-admin').textContent='📊 Admin';
+    loadMainStock();
+  }else{document.getElementById('lock-error').style.display='block';document.getElementById('lock-pass').value='';}
+}
+function logout(){
+  document.getElementById('admin-lock').style.display='';document.getElementById('admin-dash').style.display='none';
+  document.getElementById('lock-pass').value='';document.getElementById('lock-error').style.display='none';
+  document.getElementById('tab-btn-admin').textContent='🔒 Admin';
+  document.getElementById('report-section').classList.remove('show');document.getElementById('reserve-report-section').classList.remove('show');
+}
+function setMonth(f,t,o){
+  const now=new Date(),s=new Date(now.getFullYear(),now.getMonth()+o,1),e=new Date(now.getFullYear(),now.getMonth()+o+1,0);
+  document.getElementById(f).value=s.toISOString().split('T')[0];document.getElementById(t).value=e.toISOString().split('T')[0];
+}
+function clearTruckFilters(){document.getElementById('f-truck').value='';document.getElementById('f-fueltype').value='';document.getElementById('f-from').value='';document.getElementById('f-to').value='';document.getElementById('report-section').classList.remove('show');}
+function clearReserveFilters(){document.getElementById('rf-fueltype').value='';document.getElementById('rf-tx').value='';document.getElementById('rf-dest').value='';document.getElementById('rf-from').value='';document.getElementById('rf-to').value='';document.getElementById('reserve-report-section').classList.remove('show');}
+function setReportType(t){
+  reportType=t;
+  document.getElementById('rtype-trucks').classList.toggle('active',t==='trucks');
+  document.getElementById('rtype-reserve').classList.toggle('active',t==='reserve');
+  document.getElementById('rtype-stock').classList.toggle('active',t==='stock');
+  document.getElementById('truck-filters').classList.toggle('hidden',t!=='trucks');
+  document.getElementById('reserve-filters').classList.toggle('hidden',t!=='reserve');
+  document.getElementById('stock-filters').classList.toggle('hidden',t!=='stock');
+  document.getElementById('report-section').classList.remove('show');
+  document.getElementById('reserve-report-section').classList.remove('show');
+  document.getElementById('stock-report-section').classList.remove('show');
+}
+
+// ===== TRUCK REPORT =====
+async function generateTruckReport() {
+  document.getElementById('load-spinner').style.display='block';
+  await new Promise(resolve=>{
+    const cb='cb_'+Date.now(),sc=document.createElement('script');
+    sc.src=SCRIPT_URL+'?action=getAll&callback='+cb;
+    sc.onerror=()=>{allEntries=[];try{document.body.removeChild(sc);}catch(e){}resolve();};
+    window[cb]=function(data){allEntries=data.entries||[];delete window[cb];try{document.body.removeChild(sc);}catch(e){}resolve();};
+    document.body.appendChild(sc);setTimeout(resolve,10000);
+  });
+  const truck=document.getElementById('f-truck').value,ftype=document.getElementById('f-fueltype').value;
+  const from=document.getElementById('f-from').value,to=document.getElementById('f-to').value;
+  const trucks=[...new Set(allEntries.map(e=>e.truck))].sort();
+  const ts=document.getElementById('f-truck'),sv=ts.value;
+  ts.innerHTML='<option value="">All Trucks</option>'+trucks.map(t=>`<option value="${t}" ${t===sv?'selected':''}>${t}</option>`).join('');
+  currentReport=allEntries.filter(e=>{
+    if(truck&&e.truck!==truck)return false;if(ftype&&e.fuelType!==ftype)return false;
+    if(from&&e.date<from)return false;if(to&&e.date>to)return false;return true;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+  const totalL=currentReport.reduce((s,e)=>s+parseFloat(e.litres||0),0);
+  const totalKm=currentReport.filter(e=>e.km).reduce((s,e)=>s+parseFloat(e.km||0),0);
+  const withKpl=currentReport.filter(e=>e.kpl),avgKpl=withKpl.length?withKpl.reduce((s,e)=>s+parseFloat(e.kpl),0)/withKpl.length:0;
+  document.getElementById('r-entries').textContent=currentReport.length;
+  document.getElementById('r-litres').textContent=Math.round(totalL).toLocaleString()+' L';
+  document.getElementById('r-km').textContent=Math.round(totalKm).toLocaleString()+' km';
+  document.getElementById('r-avg').textContent=avgKpl?avgKpl.toFixed(1):'—';
+  let label='📋 '+(truck?'Truck: '+truck:'All Trucks');if(ftype)label+=' · '+ftype;if(from||to)label+=' · '+(from||'…')+' → '+(to||'…');
+  document.getElementById('report-label').textContent=label;
+  const tbody=document.getElementById('tbl-body'),empty=document.getElementById('tbl-empty');
+  if(!currentReport.length){tbody.innerHTML='';empty.style.display='';}
+  else{empty.style.display='none';tbody.innerHTML=currentReport.map((e,i)=>{
+    const alert=checkTruckAlert(e.truck,e.kpl?parseFloat(e.kpl):null);
+    const rowStyle=alert&&alert.type==='danger'?'background:#ffebee;':alert&&alert.type==='warn'?'background:#fff8e1;':'';
+    const kplDisplay=e.kpl?(alert&&alert.type==='danger'?'<span style="color:#c62828;font-weight:700;">🚨'+e.kpl+'</span>':alert&&alert.type==='warn'?'<span style="color:#e65100;font-weight:700;">⚠️'+e.kpl+'</span>':e.kpl):'—';
+    return `<tr style="${rowStyle}"><td>${e.date}</td><td>${e.truck}</td><td><span class="badge-${(e.fuelType||'diesel').toLowerCase()}">${e.fuelType||'—'}</span></td><td>${e.prev?Number(e.prev).toLocaleString():(e.meterBroken?'⚠️':'—')}</td><td>${e.curr?Number(e.curr).toLocaleString():(e.meterBroken?'⚠️':'—')}</td><td>${e.km?'<strong>'+Number(e.km).toLocaleString()+' km</strong>':(e.meterBroken?'⚠️No meter':'—')}</td><td>${e.litres} L</td><td>${kplDisplay}</td><td><button class="btn-edit" onclick="openEdit(${i},'truck')">✏️</button></td></tr>`;
+  }).join('')+`<tr class="tbl-foot"><td colspan="5">TOTAL</td><td>${Math.round(totalKm).toLocaleString()} km</td><td>${Math.round(totalL).toLocaleString()} L</td><td>${avgKpl?avgKpl.toFixed(1):'—'}</td><td></td></tr>`;}
+  document.getElementById('report-section').classList.add('show');document.getElementById('load-spinner').style.display='none';
+}
+
+// ===== RESERVE REPORT =====
+async function generateReserveReport() {
+  document.getElementById('rload-spinner').style.display='block';
+  await new Promise(resolve=>{
+    const cb='cr_'+Date.now(),sc=document.createElement('script');
+    sc.src=SCRIPT_URL+'?action=getReserve&callback='+cb;
+    sc.onerror=()=>{allReserve=[];try{document.body.removeChild(sc);}catch(e){}resolve();};
+    window[cb]=function(data){allReserve=data.entries||[];delete window[cb];try{document.body.removeChild(sc);}catch(e){}resolve();};
+    document.body.appendChild(sc);setTimeout(resolve,10000);
+  });
+  const ftype=document.getElementById('rf-fueltype').value,tx=document.getElementById('rf-tx').value;
+  const dest=document.getElementById('rf-dest').value,from=document.getElementById('rf-from').value,to=document.getElementById('rf-to').value;
+  currentReserveReport=allReserve.filter(e=>{
+    if(ftype&&e.fuelType!==ftype)return false;if(tx&&e.txType!==tx)return false;
+    if(dest&&e.destination!==dest)return false;if(from&&e.date<from)return false;if(to&&e.date>to)return false;return true;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+  const isSpecificDest = dest !== '';
+  const totalRec=currentReserveReport.filter(e=>e.txType==='Receive').reduce((s,e)=>s+parseFloat(e.litres||0),0);
+  const totalOut=currentReserveReport.filter(e=>e.txType==='Out').reduce((s,e)=>s+parseFloat(e.litres||0),0);
+  const totalSent=currentReserveReport.reduce((s,e)=>s+parseFloat(e.litres||0),0);
+  const balance=totalRec-totalOut;
+  document.getElementById('rr-entries').textContent=currentReserveReport.length;
+  if(isSpecificDest){
+    // Specific depot or generator — show only total sent
+    document.getElementById('rr-received').textContent='—';
+    document.getElementById('rr-out').textContent='—';
+    document.getElementById('rr-balance').textContent=Math.round(totalSent).toLocaleString()+' L';
+    document.getElementById('rr-received-label').textContent='Total Received';
+    document.getElementById('rr-out-label').textContent='Total Out';
+    document.getElementById('rr-balance-label').textContent='Total Sent';
+  } else {
+    // All — show full received/out/balance
+    document.getElementById('rr-received').textContent=Math.round(totalRec).toLocaleString()+' L';
+    document.getElementById('rr-out').textContent=Math.round(totalOut).toLocaleString()+' L';
+    document.getElementById('rr-balance').textContent=Math.round(balance).toLocaleString()+' L';
+    document.getElementById('rr-received-label').textContent='Total Received';
+    document.getElementById('rr-out-label').textContent='Total Out';
+    document.getElementById('rr-balance-label').textContent='Balance';
+  }
+  let label='🛢️ Reserve Tank';if(ftype)label+=' · '+ftype;if(tx)label+=' · '+tx;if(dest)label+=' · '+dest;if(from||to)label+=' · '+(from||'…')+' → '+(to||'…');
+  document.getElementById('r-report-label').textContent=label;
+  const tbody=document.getElementById('r-tbl-body'),empty=document.getElementById('r-tbl-empty');
+  if(!currentReserveReport.length){tbody.innerHTML='';empty.style.display='';}
+  else{
+    empty.style.display='none';
+    const footText = isSpecificDest
+      ? `<tr class="tbl-foot"><td colspan="4">TOTAL SENT TO ${dest.toUpperCase()}</td><td>${Math.round(totalSent).toLocaleString()} L</td><td></td></tr>`
+      : `<tr class="tbl-foot"><td colspan="2">TOTAL</td><td colspan="2">Received: ${Math.round(totalRec).toLocaleString()} L &nbsp;|&nbsp; Out: ${Math.round(totalOut).toLocaleString()} L</td><td>${Math.round(balance).toLocaleString()} L</td><td></td></tr>`;
+    tbody.innerHTML=currentReserveReport.map((e,i)=>`<tr><td>${e.date}</td><td><span class="badge-${(e.fuelType||'diesel').toLowerCase()}">${e.fuelType||'—'}</span></td><td><span class="${e.txType==='Receive'?'badge-in':'badge-out'}">${e.txType}</span></td><td>${e.destination||'—'}</td><td><strong>${e.litres} L</strong></td><td><button class="btn-edit" onclick="openEdit(${i},'reserve')">✏️</button></td></tr>`).join('')+footText;
+  }
+  document.getElementById('reserve-report-section').classList.add('show');document.getElementById('rload-spinner').style.display='none';
+}
+
+// ===== EDIT MODAL =====
+function openEdit(idx,type){
+  editRow=idx;editType=type;
+  const e=type==='truck'?currentReport[idx]:currentReserveReport[idx];
+  document.getElementById('modal-title').textContent=type==='truck'?'✏️ Edit Truck Entry':'✏️ Edit Reserve Entry';
+  let fields='';
+  if(type==='truck'){fields=`<div class="field"><label>Date</label><input id="e-date" type="date" value="${e.date||''}"/></div><div class="row2"><div class="field"><label>Driver</label><input id="e-name" type="text" value="${e.name||''}"/></div><div class="field"><label>Truck</label><input id="e-truck" type="text" value="${e.truck||''}"/></div></div><div class="field"><label>Fuel Type</label><select id="e-fueltype"><option ${e.fuelType==='Diesel'?'selected':''}>Diesel</option><option ${e.fuelType==='Petrol'?'selected':''}>Petrol</option></select></div><div class="row2"><div class="field"><label>Prev km</label><input id="e-prev" type="number" value="${e.prev||''}"/></div><div class="field"><label>Curr km</label><input id="e-curr" type="number" value="${e.curr||''}"/></div></div><div class="field"><label>Litres</label><input id="e-litres" type="number" value="${e.litres||''}"/></div>`;}
+  else{fields=`<div class="field"><label>Date</label><input id="e-date" type="date" value="${e.date||''}"/></div><div class="field"><label>Fuel Type</label><select id="e-fueltype"><option ${e.fuelType==='Diesel'?'selected':''}>Diesel</option><option ${e.fuelType==='Petrol'?'selected':''}>Petrol</option></select></div><div class="field"><label>Type</label><select id="e-txtype"><option ${e.txType==='Receive'?'selected':''}>Receive</option><option ${e.txType==='Out'?'selected':''}>Out</option></select></div><div class="field"><label>Destination</label><input id="e-dest" type="text" value="${e.destination||''}"/></div><div class="field"><label>Litres</label><input id="e-litres" type="number" value="${e.litres||''}"/></div>`;}
+  document.getElementById('modal-fields').innerHTML=fields;
+  document.getElementById('edit-modal').classList.add('show');
+}
+function closeModal(){document.getElementById('edit-modal').classList.remove('show');editRow=null;editType=null;}
+async function saveEdit(){
+  const e=editType==='truck'?currentReport[editRow]:currentReserveReport[editRow];
+  let updated={};
+  if(editType==='truck'){
+    const prev=parseFloat(document.getElementById('e-prev').value)||null,curr=parseFloat(document.getElementById('e-curr').value)||null,litres=parseFloat(document.getElementById('e-litres').value)||null;
+    const km=prev&&curr&&curr>prev?curr-prev:null,kpl=km&&litres?parseFloat((km/litres).toFixed(2)):null,lp100=km&&litres?parseFloat(((litres/km)*100).toFixed(2)):null;
+    updated={sheet:'trucks',rowId:e.rowId,date:document.getElementById('e-date').value,name:document.getElementById('e-name').value,truck:document.getElementById('e-truck').value,fuelType:document.getElementById('e-fueltype').value,prev,curr,km,litres,kpl,lp100};
+  }else{
+    updated={sheet:'reserve',rowId:e.rowId,date:document.getElementById('e-date').value,fuelType:document.getElementById('e-fueltype').value,txType:document.getElementById('e-txtype').value,destination:document.getElementById('e-dest').value,litres:parseFloat(document.getElementById('e-litres').value)||0};
+  }
+  try{await fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'edit',...updated})});closeModal();alert('✅ Updated! Regenerate report to see changes.');}
+  catch(err){alert('❌ Could not save.');}
+}
+
+// ===== EXPORTS =====
+function exportTruckCSV(){
+  if(!currentReport.length){alert('Generate a report first.');return;}
+  const rows=[['Date','Driver','Truck','Fuel Type','Prev km','Curr km','Km Travelled','Litres','km/L','L/100km']];
+  currentReport.forEach(e=>rows.push([e.date,e.name,e.truck,e.fuelType||'',e.prev||'',e.curr||'',e.km||'',e.litres,e.kpl||'',e.lp100||'']));
+  const totalL=currentReport.reduce((s,e)=>s+parseFloat(e.litres||0),0);
+  rows.push([]);rows.push(['TOTAL','','','','','','',Math.round(totalL)+' L','','']);
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
+  a.download='cb_trucks_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+}
+function exportReserveCSV(){
+  if(!currentReserveReport.length){alert('Generate a report first.');return;}
+  const rows=[['Date','Fuel Type','Type','Destination','Litres']];
+  currentReserveReport.forEach(e=>rows.push([e.date,e.fuelType||'',e.txType||'',e.destination||'',e.litres||0]));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
+  a.download='cb_reserve_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+}
+function exportTruckPDF(){
+  if(!currentReport.length){alert('Generate a report first.');return;}
+  const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape'});
+  doc.setFontSize(16);doc.setTextColor(24,95,165);doc.text('Capital Bakery — Fleet Fuel Report',14,16);
+  doc.setFontSize(10);doc.setTextColor(100);doc.text(document.getElementById('report-label').textContent.replace('📋 ',''),14,24);doc.text('Generated: '+new Date().toLocaleDateString(),14,30);
+  const totalL=currentReport.reduce((s,e)=>s+parseFloat(e.litres||0),0),totalKm=currentReport.filter(e=>e.km).reduce((s,e)=>s+parseFloat(e.km||0),0);
+  doc.setTextColor(0);doc.setFontSize(10);doc.text(`Entries: ${currentReport.length}  |  Total Litres: ${Math.round(totalL).toLocaleString()} L  |  Total km: ${Math.round(totalKm).toLocaleString()} km`,14,37);
+  doc.autoTable({startY:42,head:[['Date','Driver','Truck','Fuel','Prev km','Curr km','Travelled','Litres','km/L']],body:currentReport.map(e=>[e.date,e.name,e.truck,e.fuelType||'—',e.prev?Number(e.prev).toLocaleString():(e.meterBroken?'No meter':'—'),e.curr?Number(e.curr).toLocaleString():(e.meterBroken?'No meter':'—'),e.km?Number(e.km).toLocaleString()+' km':(e.meterBroken?'No meter':'—'),e.litres+' L',e.kpl||'—']),styles:{fontSize:8},headStyles:{fillColor:[24,95,165]},foot:[['TOTAL','','','','','',Math.round(totalKm).toLocaleString()+' km',Math.round(totalL).toLocaleString()+' L','']],footStyles:{fillColor:[240,246,255],textColor:[24,95,165],fontStyle:'bold'}});
+  doc.save('cb_trucks_'+new Date().toISOString().split('T')[0]+'.pdf');
+}
+function exportReservePDF(){
+  if(!currentReserveReport.length){alert('Generate a report first.');return;}
+  const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape'});
+  doc.setFontSize(16);doc.setTextColor(24,95,165);doc.text('Capital Bakery — Reserve Tank Report',14,16);
+  doc.setFontSize(10);doc.setTextColor(100);doc.text('Generated: '+new Date().toLocaleDateString(),14,24);
+  const totalRec=currentReserveReport.filter(e=>e.txType==='Receive').reduce((s,e)=>s+parseFloat(e.litres||0),0);
+  const totalOut=currentReserveReport.filter(e=>e.txType==='Out').reduce((s,e)=>s+parseFloat(e.litres||0),0);
+  doc.setTextColor(0);doc.setFontSize(10);doc.text(`Total Received: ${Math.round(totalRec).toLocaleString()} L  |  Total Out: ${Math.round(totalOut).toLocaleString()} L  |  Balance: ${Math.round(totalRec-totalOut).toLocaleString()} L`,14,31);
+  doc.autoTable({startY:36,head:[['Date','Fuel Type','Type','Destination','Litres']],body:currentReserveReport.map(e=>[e.date,e.fuelType||'—',e.txType||'—',e.destination||'—',(e.litres||0)+' L']),styles:{fontSize:9},headStyles:{fillColor:[24,95,165]},foot:[['TOTAL','','Received: '+Math.round(totalRec).toLocaleString()+' L','Out: '+Math.round(totalOut).toLocaleString()+' L','Balance: '+Math.round(totalRec-totalOut).toLocaleString()+' L']],footStyles:{fillColor:[240,246,255],textColor:[24,95,165],fontStyle:'bold'}});
+  doc.save('cb_reserve_'+new Date().toISOString().split('T')[0]+'.pdf');
+}
+
+// ===== MAIN STOCK =====
+let stockFuelType = 'Diesel';
+
+function openStockModal() {
+  document.getElementById('sm-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('sm-litres').value = '';
+  document.getElementById('sm-supplier').value = '';
+  document.getElementById('stock-modal').classList.add('show');
+}
+function closeStockModal() { document.getElementById('stock-modal').classList.remove('show'); }
+function setStockFuelType(t) {
+  stockFuelType = t;
+  document.getElementById('sm-btn-diesel').classList.toggle('active', t==='Diesel');
+  document.getElementById('sm-btn-petrol').classList.toggle('active', t==='Petrol');
+}
+async function saveStock() {
+  const date = document.getElementById('sm-date').value;
+  const litres = parseFloat(document.getElementById('sm-litres').value);
+  const supplier = document.getElementById('sm-supplier').value.trim();
+  if (!date || !litres) { alert('Please enter date and litres.'); return; }
+  try {
+    await fetch(SCRIPT_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body: JSON.stringify({sheet:'stock', date, fuelType: stockFuelType, litres, supplier}) });
+    closeStockModal();
+    alert('✅ Stock entry saved!');
+    setTimeout(loadMainStock, 1500);
+  } catch(err) { alert('❌ Could not save. Check internet.'); }
+}
+
+function loadMainStock() {
+  const cb='ms_'+Date.now(), sc=document.createElement('script');
+  sc.src=SCRIPT_URL+'?action=getMainStock&callback='+cb;
+  window[cb]=function(data){
+    delete window[cb]; try{document.body.removeChild(sc);}catch(e){}
+    document.getElementById('ms-d-received').textContent=(data.dReceived||0).toLocaleString()+' L';
+    document.getElementById('ms-d-trucks').textContent=(data.dTrucks||0).toLocaleString()+' L';
+    document.getElementById('ms-d-reserve').textContent=(data.dReserve||0).toLocaleString()+' L';
+    document.getElementById('ms-d-balance').textContent=(data.dBalance||0).toLocaleString()+' L';
+    document.getElementById('ms-p-received').textContent=(data.pReceived||0).toLocaleString()+' L';
+    document.getElementById('ms-p-trucks').textContent=(data.pTrucks||0).toLocaleString()+' L';
+    document.getElementById('ms-p-reserve').textContent=(data.pReserve||0).toLocaleString()+' L';
+    document.getElementById('ms-p-balance').textContent=(data.pBalance||0).toLocaleString()+' L';
+  };
+  sc.onerror=()=>{try{document.body.removeChild(sc);}catch(e){}};
+  document.body.appendChild(sc);
+}
+
+
+// ===== STOCK REPORT =====
+let currentStockReport = [], allStock = [];
+
+function clearStockFilters() {
+  document.getElementById('sf-fueltype').value='';
+  document.getElementById('sf-tx').value='';
+  document.getElementById('sf-from').value='';
+  document.getElementById('sf-to').value='';
+  document.getElementById('stock-report-section').classList.remove('show');
+}
+
+async function generateStockReport() {
+  document.getElementById('sload-spinner').style.display='block';
+
+  const [stockData, truckData, reserveData] = await Promise.all([
+    fetchData('getStockEntries'),
+    fetchData('getAll'),
+    fetchData('getReserve')
+  ]);
+
+  const ftype = document.getElementById('sf-fueltype').value;
+  const from = document.getElementById('sf-from').value;
+  const to = document.getElementById('sf-to').value;
+
+  // Filter by date and fuel type
+  function inRange(e) {
+    if (ftype && e.fuelType !== ftype) return false;
+    if (from && e.date < from) return false;
+    if (to && e.date > to) return false;
+    return true;
+  }
+
+  // ---- RECEIVED: group by supplier ----
+  const receivedMap = {};
+  (stockData.entries||[]).filter(inRange).forEach(e => {
+    const key = (e.fuelType||'Diesel') + '||' + (e.supplier||'Unknown');
+    if (!receivedMap[key]) receivedMap[key] = {fuelType:e.fuelType, supplier:e.supplier||'Unknown', litres:0};
+    receivedMap[key].litres += parseFloat(e.litres||0);
+  });
+
+  // ---- TRUCKS OUT: group by truck ----
+  const trucksMap = {};
+  (truckData.entries||[]).filter(inRange).forEach(e => {
+    const key = (e.fuelType||'Diesel') + '||' + e.truck;
+    if (!trucksMap[key]) trucksMap[key] = {fuelType:e.fuelType||'Diesel', truck:e.truck, litres:0};
+    trucksMap[key].litres += parseFloat(e.litres||0);
+  });
+
+  // ---- RESERVE OUT: group by fuel type ----
+  const reserveMap = {};
+  (reserveData.entries||[]).filter(e => e.txType==='Receive' && inRange(e)).forEach(e => {
+    const key = e.fuelType||'Diesel';
+    if (!reserveMap[key]) reserveMap[key] = {fuelType:e.fuelType||'Diesel', litres:0};
+    reserveMap[key].litres += parseFloat(e.litres||0);
+  });
+
+  // Totals
+  const totalRec = Object.values(receivedMap).reduce((s,e)=>s+e.litres,0);
+  const totalTrucks = Object.values(trucksMap).reduce((s,e)=>s+e.litres,0);
+  const totalReserve = Object.values(reserveMap).reduce((s,e)=>s+e.litres,0);
+  const totalOut = totalTrucks + totalReserve;
+  const balance = totalRec - totalOut;
+
+  document.getElementById('sr-entries').textContent = Object.keys(trucksMap).length + ' trucks';
+  document.getElementById('sr-received').textContent = Math.round(totalRec).toLocaleString()+' L';
+  document.getElementById('sr-out').textContent = Math.round(totalOut).toLocaleString()+' L';
+  document.getElementById('sr-balance').textContent = Math.round(balance).toLocaleString()+' L';
+
+  let label = '⛽ Fuel Stock Summary';
+  if (ftype) label += ' · '+ftype;
+  if (from||to) label += ' · '+(from||'…')+' → '+(to||'…');
+  document.getElementById('s-report-label').textContent = label;
+
+  const tbody = document.getElementById('s-tbl-body');
+  const empty = document.getElementById('s-tbl-empty');
+
+  let rows = '';
+
+  // Section: Received
+  if (Object.keys(receivedMap).length > 0) {
+    rows += `<tr style="background:#e8f5e9;"><td colspan="3" style="font-weight:700;color:#2e7d32;padding:8px 10px;">📥 RECEIVED FROM SUPPLIER</td><td></td><td></td></tr>`;
+    Object.values(receivedMap).forEach(e => {
+      rows += `<tr><td></td><td><span class="badge-${e.fuelType.toLowerCase()}">${e.fuelType}</span></td><td colspan="2">${e.supplier}</td><td style="color:#2e7d32;font-weight:600;">+${Math.round(e.litres).toLocaleString()} L</td></tr>`;
+    });
+    rows += `<tr style="background:#f0f6ff;"><td colspan="4" style="font-weight:700;color:#185FA5;padding:8px 10px;">Total Received</td><td style="font-weight:700;color:#185FA5;">+${Math.round(totalRec).toLocaleString()} L</td></tr>`;
+  }
+
+  // Section: Trucks Out
+  if (Object.keys(trucksMap).length > 0) {
+    rows += `<tr style="background:#fff3e0;"><td colspan="3" style="font-weight:700;color:#e65100;padding:8px 10px;">🚚 TRUCKS OUT</td><td></td><td></td></tr>`;
+    // Sort by fuel type then truck
+    Object.values(trucksMap).sort((a,b)=>a.fuelType.localeCompare(b.fuelType)||a.truck.localeCompare(b.truck)).forEach(e => {
+      rows += `<tr><td></td><td><span class="badge-${e.fuelType.toLowerCase()}">${e.fuelType}</span></td><td colspan="2">${e.truck}</td><td style="color:#e65100;font-weight:600;">-${Math.round(e.litres).toLocaleString()} L</td></tr>`;
+    });
+    rows += `<tr style="background:#f0f6ff;"><td colspan="4" style="font-weight:700;color:#185FA5;padding:8px 10px;">Total Trucks Out</td><td style="font-weight:700;color:#185FA5;">-${Math.round(totalTrucks).toLocaleString()} L</td></tr>`;
+  }
+
+  // Section: Reserve Out
+  if (Object.keys(reserveMap).length > 0) {
+    rows += `<tr style="background:#e3f2fd;"><td colspan="3" style="font-weight:700;color:#1565c0;padding:8px 10px;">🛢️ RESERVE TANK OUT</td><td></td><td></td></tr>`;
+    Object.values(reserveMap).forEach(e => {
+      rows += `<tr><td></td><td><span class="badge-${e.fuelType.toLowerCase()}">${e.fuelType}</span></td><td colspan="2">To Reserve Tank</td><td style="color:#1565c0;font-weight:600;">-${Math.round(e.litres).toLocaleString()} L</td></tr>`;
+    });
+    rows += `<tr style="background:#f0f6ff;"><td colspan="4" style="font-weight:700;color:#185FA5;padding:8px 10px;">Total Reserve Out</td><td style="font-weight:700;color:#185FA5;">-${Math.round(totalReserve).toLocaleString()} L</td></tr>`;
+  }
+
+  if (!rows) { tbody.innerHTML=''; empty.style.display=''; }
+  else {
+    empty.style.display='none';
+    tbody.innerHTML = rows + `<tr class="tbl-foot"><td colspan="4">BALANCE STOCK</td><td>${Math.round(balance).toLocaleString()} L</td></tr>`;
+  }
+
+  // Store for export
+  currentStockReport = {receivedMap, trucksMap, reserveMap, totalRec, totalTrucks, totalReserve, totalOut, balance, ftype, from, to};
+
+  document.getElementById('stock-report-section').classList.add('show');
+  document.getElementById('sload-spinner').style.display='none';
+}
+
+// Helper to fetch data via JSONP
+function fetchData(action) {
+  return new Promise(resolve => {
+    const cb = 'fd_'+Date.now()+'_'+Math.random().toString(36).substr(2,5);
+    const sc = document.createElement('script');
+    sc.src = SCRIPT_URL+'?action='+action+'&callback='+cb;
+    sc.onerror = () => { try{document.body.removeChild(sc);}catch(e){} resolve({}); };
+    window[cb] = function(data) { delete window[cb]; try{document.body.removeChild(sc);}catch(e){} resolve(data); };
+    document.body.appendChild(sc);
+    setTimeout(() => resolve({}), 10000);
+  });
+}
+
+function exportStockCSV() {
+  if (!currentStockReport || !currentStockReport.receivedMap) { alert('Generate a report first.'); return; }
+  const {receivedMap,trucksMap,reserveMap,totalRec,totalTrucks,totalReserve,totalOut,balance} = currentStockReport;
+  const rows = [['Section','Fuel Type','Details','Litres']];
+  rows.push(['--- RECEIVED FROM SUPPLIER ---','','','']);
+  Object.values(receivedMap).forEach(e=>rows.push(['Received',e.fuelType,e.supplier,'+'+Math.round(e.litres)+' L']));
+  rows.push(['Total Received','','','+'+Math.round(totalRec)+' L']);
+  rows.push(['','','','']);
+  rows.push(['--- TRUCKS OUT ---','','','']);
+  Object.values(trucksMap).sort((a,b)=>a.truck.localeCompare(b.truck)).forEach(e=>rows.push(['Trucks Out',e.fuelType,e.truck,'-'+Math.round(e.litres)+' L']));
+  rows.push(['Total Trucks Out','','','-'+Math.round(totalTrucks)+' L']);
+  rows.push(['','','','']);
+  if(Object.keys(reserveMap).length>0){
+    rows.push(['--- RESERVE TANK OUT ---','','','']);
+    Object.values(reserveMap).forEach(e=>rows.push(['Reserve Out',e.fuelType,'To Reserve Tank','-'+Math.round(e.litres)+' L']));
+    rows.push(['Total Reserve Out','','','-'+Math.round(totalReserve)+' L']);
+    rows.push(['','','','']);
+  }
+  rows.push(['BALANCE STOCK','','',Math.round(balance)+' L']);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\u000A')],{type:'text/csv'}));
+  a.download='cb_stock_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+}
+
+function exportStockPDF() {
+  if (!currentStockReport || !currentStockReport.receivedMap) { alert('Generate a report first.'); return; }
+  const {receivedMap,trucksMap,reserveMap,totalRec,totalTrucks,totalReserve,totalOut,balance,ftype,from,to} = currentStockReport;
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait'});
+  doc.setFontSize(16); doc.setTextColor(24,95,165);
+  doc.text('Capital Bakery — Fuel Stock Summary', 14, 16);
+  doc.setFontSize(10); doc.setTextColor(100);
+  let label = ftype||'All Fuel';
+  if(from||to) label += ' · '+(from||'…')+' → '+(to||'…');
+  doc.text(label, 14, 24);
+  doc.text('Generated: '+new Date().toLocaleDateString(), 14, 30);
+  doc.setTextColor(0);
+
+  const body = [];
+  body.push(['📥 RECEIVED FROM SUPPLIER','','']);
+  Object.values(receivedMap).forEach(e=>body.push([e.fuelType, e.supplier, '+'+Math.round(e.litres).toLocaleString()+' L']));
+  body.push(['','Total Received','+'+Math.round(totalRec).toLocaleString()+' L']);
+  body.push(['','','']);
+  body.push(['🚚 TRUCKS OUT','','']);
+  Object.values(trucksMap).sort((a,b)=>a.truck.localeCompare(b.truck)).forEach(e=>body.push([e.fuelType, e.truck, '-'+Math.round(e.litres).toLocaleString()+' L']));
+  body.push(['','Total Trucks Out','-'+Math.round(totalTrucks).toLocaleString()+' L']);
+  if(Object.keys(reserveMap).length>0){
+    body.push(['','','']);
+    body.push(['🛢️ RESERVE TANK OUT','','']);
+    Object.values(reserveMap).forEach(e=>body.push([e.fuelType,'To Reserve Tank','-'+Math.round(e.litres).toLocaleString()+' L']));
+    body.push(['','Total Reserve Out','-'+Math.round(totalReserve).toLocaleString()+' L']);
+  }
+
+  doc.autoTable({
+    startY:36,
+    head:[['Fuel Type','Details','Litres']],
+    body: body,
+    styles:{fontSize:9},
+    headStyles:{fillColor:[24,95,165]},
+    foot:[['','BALANCE STOCK', Math.round(balance).toLocaleString()+' L']],
+    footStyles:{fillColor:[240,246,255],textColor:[24,95,165],fontStyle:'bold',fontSize:11}
+  });
+  doc.save('cb_stock_'+new Date().toISOString().split('T')[0]+'.pdf');
+}
+
+</script>
+</body>
+</html>
