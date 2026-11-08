@@ -215,8 +215,9 @@
 
     <div class="card">
       <div class="card-title">Report Filters</div>
-      <div class="field"><label>Depot</label>
-        <select id="f-depot"></select>
+      <div class="filter-row">
+        <div class="field"><label>Depot</label><select id="f-depot"></select></div>
+        <div class="field"><label>Truck Number</label><select id="f-truck"><option value="">All trucks</option></select></div>
       </div>
       <div class="filter-row">
         <div class="field"><label>From Date</label><input type="date" id="f-from" /></div>
@@ -237,14 +238,7 @@
     <div id="report-section" class="hidden">
       <div class="summary-box">
         <div class="summary-title" id="report-label"></div>
-        <div class="summary-grid">
-          <div class="sum-item"><div class="sum-val" id="s-bf">0 L</div><div class="sum-label">Brought forward</div></div>
-          <div class="sum-item"><div class="sum-val" id="s-recv">0 L</div><div class="sum-label">Litres received</div></div>
-          <div class="sum-item"><div class="sum-val" id="s-filled">0 L</div><div class="sum-label">Litres filled</div></div>
-          <div class="sum-item"><div class="sum-val" id="s-bal">0 L</div><div class="sum-label">Balance fuel</div></div>
-          <div class="sum-item"><div class="sum-val" id="s-km">0 km</div><div class="sum-label">Total km</div></div>
-          <div class="sum-item"><div class="sum-val" id="s-kpl">—</div><div class="sum-label">Avg km/L</div></div>
-        </div>
+        <div class="summary-grid" id="summary-grid"></div>
       </div>
       <div class="export-bar">
         <span style="font-size:13px;color:#888;">Export:</span>
@@ -259,7 +253,7 @@
           <tbody id="t-depots"></tbody>
         </table></div>
       </div>
-      <div class="card">
+      <div class="card" id="card-trucks">
         <div class="tbl-title">Per Truck: litres, km and km/L</div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>Truck</th><th class="r">Fills</th><th class="r">Litres</th><th class="r">Km</th><th class="r">km/L</th></tr></thead>
@@ -267,7 +261,7 @@
         </table></div>
         <div class="empty hidden" id="e-trucks">No truck fills in this period.</div>
       </div>
-      <div class="card">
+      <div class="card" id="card-receipts">
         <div class="tbl-title">Fuel Received</div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>Date</th><th>Depot</th><th>Type</th><th class="r">Litres</th><th>Edit</th></tr></thead>
@@ -276,7 +270,7 @@
         <div class="empty hidden" id="e-receipts">No fuel received in this period.</div>
       </div>
       <div class="card">
-        <div class="tbl-title">Truck Fill Details</div>
+        <div class="tbl-title" id="fills-title">Truck Fill Details</div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>Date</th><th>Depot</th><th>Truck</th><th class="r">Prev km</th><th class="r">Curr km</th><th class="r">Km</th><th class="r">Litres</th><th class="r">km/L</th><th>Edit</th></tr></thead>
           <tbody id="t-fills"></tbody>
@@ -518,7 +512,7 @@ function unlock(){
   if($('lock-pass').value === ADMIN_PASSWORD){
     $('admin-lock').style.display='none'; $('admin-dash').style.display=''; $('lock-pass').value=''; $('lock-error').style.display='none';
     $('f-depot').innerHTML = '<option value="">All depots</option>' + DEPOTS.map(d=>'<option>'+d+'</option>').join('');
-    setMonth(0);
+    fillTruckList(); setMonth(0);
   } else $('lock-error').style.display='block';
 }
 function logout(){ $('admin-dash').style.display='none'; $('admin-lock').style.display=''; $('report-section').classList.add('hidden'); }
@@ -526,21 +520,38 @@ function setMonth(off){
   const n = new Date(), a = new Date(n.getFullYear(), n.getMonth()+off, 1), b = new Date(n.getFullYear(), n.getMonth()+off+1, 0);
   $('f-from').value = dstr(a); $('f-to').value = dstr(b);
 }
-function clearFilters(){ $('f-from').value=''; $('f-to').value=''; $('f-depot').value=''; }
+function clearFilters(){ $('f-from').value=''; $('f-to').value=''; $('f-depot').value=''; $('f-truck').value=''; }
+function fillTruckList(){
+  const sel = $('f-truck'), cur = sel.value;
+  const set = new Set(DIESEL_TRUCKS); allFills.forEach(x => { const t = cleanTruck(x.truck); if(t) set.add(t); });
+  sel.innerHTML = '<option value="">All trucks</option>' + Array.from(set).sort().map(t=>'<option>'+esc(t)+'</option>').join('');
+  sel.value = cur;
+}
 
 async function generateReport(){
   $('load-spinner').style.display='block'; $('admin-error').style.display='none';
   try{
     const [f, r] = await Promise.all([api({action:'getFills'}), api({action:'getReceipts'})]);
     allFills = f.entries || []; allReceipts = r.entries || [];
-    report = compute($('f-depot').value, $('f-from').value, $('f-to').value);
+    fillTruckList();
+    report = compute($('f-depot').value, $('f-from').value, $('f-to').value, $('f-truck').value);
     renderReport();
   }catch(e){ const el=$('admin-error'); el.textContent='❌ Could not load data. ('+e.message+')'; el.style.display='block'; }
   $('load-spinner').style.display='none';
 }
-function compute(dep, from, to){
+function compute(dep, from, to, truck){
   const names = dep ? [dep] : Array.from(new Set(DEPOTS.concat(allReceipts.map(x=>x.depot), allFills.map(x=>x.depot)).filter(Boolean)));
   const inRange = d => (!from || d>=from) && (!to || d<=to);
+  const byDate = (a,b) => a.date<b.date?-1:a.date>b.date?1:a.rowId-b.rowId;
+  const when = (from||'start')+' to '+(to||'today');
+  if(truck){
+    const fl = allFills.filter(x => cleanTruck(x.truck)===truck && (!dep || x.depot===dep) && inRange(x.date)).sort(byDate);
+    let filled=0, km=0, kmLit=0; const ks=[];
+    fl.forEach(x => { filled += x.litres; if(x.km>0){ km += x.km; kmLit += x.litres; } if(x.kpl!=null) ks.push(Number(x.kpl)); });
+    const t = {bf:0, recv:0, filled, km, kmLit, balance:0, kpl: kmLit>0 ? km/kmLit : null, n: fl.length,
+      best: ks.length ? Math.max.apply(null,ks) : null, low: ks.length ? Math.min.apply(null,ks) : null};
+    return {dep, from, to, truck, rows:[], tot:t, fills:fl, receipts:[], trucks:[], label: truck+'  |  '+(dep||'All depots')+'  |  '+when};
+  }
   const rows = names.map(n => {
     let before=0, recv=0, filled=0, km=0, kmLit=0;
     allReceipts.filter(x=>x.depot===n).forEach(x => {
@@ -569,11 +580,15 @@ function compute(dep, from, to){
 function renderReport(){
   const R = report, T = R.tot;
   $('report-section').classList.remove('hidden');
-  $('report-label').textContent = '🏭 '+R.label;
-  $('s-bf').textContent = fmt(T.bf)+' L'; $('s-recv').textContent = fmt(T.recv)+' L'; $('s-filled').textContent = fmt(T.filled)+' L';
-  $('s-bal').textContent = fmt(T.balance)+' L'; $('s-bal').className = 'sum-val'+(T.balance<0?' neg':'');
-  $('s-km').textContent = fmt(T.km,0)+' km'; $('s-kpl').textContent = T.kpl ? T.kpl.toFixed(2) : '—';
-  $('card-depots').classList.toggle('hidden', !!R.dep);
+  $('report-label').textContent = (R.truck ? '🚚 ' : '🏭 ')+R.label;
+  const items = R.truck
+    ? [[T.n,'Fills'],[fmt(T.filled)+' L','Litres filled'],[fmt(T.km,0)+' km','Total km'],[T.kpl?T.kpl.toFixed(2):'—','Avg km/L'],[T.best!=null?T.best.toFixed(2):'—','Best km/L'],[T.low!=null?T.low.toFixed(2):'—','Lowest km/L']]
+    : [[fmt(T.bf)+' L','Brought forward'],[fmt(T.recv)+' L','Litres received'],[fmt(T.filled)+' L','Litres filled'],[fmt(T.balance)+' L','Balance fuel',T.balance<0],[fmt(T.km,0)+' km','Total km'],[T.kpl?T.kpl.toFixed(2):'—','Avg km/L']];
+  $('summary-grid').innerHTML = items.map(i => '<div class="sum-item"><div class="sum-val'+(i[2]?' neg':'')+'">'+i[0]+'</div><div class="sum-label">'+i[1]+'</div></div>').join('');
+  $('card-trucks').classList.toggle('hidden', !!R.truck);
+  $('card-receipts').classList.toggle('hidden', !!R.truck);
+  $('fills-title').textContent = R.truck ? 'Fills for '+R.truck+' (date wise)' : 'Truck Fill Details';
+  $('card-depots').classList.toggle('hidden', !!R.dep || !!R.truck);
   $('t-depots').innerHTML = R.rows.map(x => '<tr><td>'+esc(x.depot)+'</td><td class="r">'+fmt(x.bf)+'</td><td class="r">'+fmt(x.recv)+'</td><td class="r">'+fmt(x.filled)+'</td><td class="r">'+fmt(x.km,0)+'</td><td class="r">'+(x.kpl?x.kpl.toFixed(2):'—')+'</td><td class="r"><b>'+fmt(x.balance)+'</b></td></tr>').join('')
     + '<tr class="foot"><td>Total</td><td class="r">'+fmt(T.bf)+'</td><td class="r">'+fmt(T.recv)+'</td><td class="r">'+fmt(T.filled)+'</td><td class="r">'+fmt(T.km,0)+'</td><td class="r">'+(T.kpl?T.kpl.toFixed(2):'—')+'</td><td class="r">'+fmt(T.balance)+'</td></tr>';
   $('t-trucks').innerHTML = R.trucks.map(x => '<tr><td>'+esc(x.truck)+'</td><td class="r">'+x.n+'</td><td class="r">'+fmt(x.litres)+'</td><td class="r">'+fmt(x.km,0)+'</td><td class="r">'+(x.kpl?x.kpl.toFixed(2):'—')+'</td></tr>').join('')
@@ -581,7 +596,8 @@ function renderReport(){
   $('e-trucks').classList.toggle('hidden', R.trucks.length>0);
   $('t-receipts').innerHTML = R.receipts.map(x => '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.depot)+'</td><td><span class="badge-in">Received</span></td><td class="r">'+fmt(x.litres)+'</td><td><button class="btn-edit" onclick="openEdit(\'receipt\','+x.rowId+')">✏️</button></td></tr>').join('');
   $('e-receipts').classList.toggle('hidden', R.receipts.length>0);
-  $('t-fills').innerHTML = R.fills.map(x => '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.depot)+'</td><td>'+esc(x.truck)+'</td><td class="r">'+(x.prev!=null?fmt(x.prev,0):'—')+'</td><td class="r">'+(x.curr!=null?fmt(x.curr,0):'—')+'</td><td class="r">'+(x.km!=null?fmt(x.km,0):(x.meterBroken?'meter ✗':'—'))+'</td><td class="r">'+fmt(x.litres)+'</td><td class="r">'+(x.kpl!=null?Number(x.kpl).toFixed(2):'—')+'</td><td><button class="btn-edit" onclick="openEdit(\'fill\','+x.rowId+')">✏️</button></td></tr>').join('');
+  $('t-fills').innerHTML = R.fills.map(x => '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.depot)+'</td><td>'+esc(x.truck)+'</td><td class="r">'+(x.prev!=null?fmt(x.prev,0):'—')+'</td><td class="r">'+(x.curr!=null?fmt(x.curr,0):'—')+'</td><td class="r">'+(x.km!=null?fmt(x.km,0):(x.meterBroken?'meter ✗':'—'))+'</td><td class="r">'+fmt(x.litres)+'</td><td class="r">'+(x.kpl!=null?Number(x.kpl).toFixed(2):'—')+'</td><td><button class="btn-edit" onclick="openEdit(\'fill\','+x.rowId+')">✏️</button></td></tr>').join('')
+    + (R.fills.length ? '<tr class="foot"><td>Total</td><td></td><td></td><td></td><td></td><td class="r">'+fmt(T.km,0)+'</td><td class="r">'+fmt(T.filled)+'</td><td class="r">'+(T.kpl?T.kpl.toFixed(2):'—')+'</td><td></td></tr>' : '');
   $('e-fills').classList.toggle('hidden', R.fills.length>0);
 }
 
@@ -630,23 +646,31 @@ async function saveEdit(){
 // ===== EXPORT =====
 function csvCell(v){ v = (v==null?'':String(v)); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
 function csvLine(a){ return a.map(csvCell).join(','); }
-function fname(ext){ return 'Depot_Fuel_'+(report.dep||'All')+'_'+(report.from||'start')+'_to_'+(report.to||'today')+'.'+ext; }
+function fname(ext){ return 'Depot_Fuel_'+(report.truck?report.truck+'_':'')+(report.dep||'All')+'_'+(report.from||'start')+'_to_'+(report.to||'today')+'.'+ext; }
 function r2(n){ return n==null?'':Math.round(n*100)/100; }
 function exportCSV(){
   if(!report) return;
   const R = report, T = R.tot, L = [];
-  L.push(csvLine(['Capital Bakery - Depot Fuel Report'])); L.push(csvLine(['Depot', R.dep||'All depots'])); L.push(csvLine(['Period', (R.from||'start')+' to '+(R.to||'today')])); L.push('');
-  L.push(csvLine(['SUMMARY'])); L.push(csvLine(['Brought forward (L)', r2(T.bf)])); L.push(csvLine(['Litres received', r2(T.recv)])); L.push(csvLine(['Litres filled', r2(T.filled)]));
-  L.push(csvLine(['Balance fuel (L)', r2(T.balance)])); L.push(csvLine(['Total km', r2(T.km)])); L.push(csvLine(['Average km/L', r2(T.kpl)])); L.push('');
-  if(!R.dep){ L.push(csvLine(['DEPOT SUMMARY'])); L.push(csvLine(['Depot','B/F','Received','Filled','Km','km/L','Balance']));
-    R.rows.forEach(x => L.push(csvLine([x.depot, r2(x.bf), r2(x.recv), r2(x.filled), r2(x.km), r2(x.kpl), r2(x.balance)]))); L.push(''); }
-  L.push(csvLine(['PER TRUCK'])); L.push(csvLine(['Truck','Fills','Litres','Km','km/L']));
-  R.trucks.forEach(x => L.push(csvLine([x.truck, x.n, r2(x.litres), r2(x.km), r2(x.kpl)]))); L.push('');
-  L.push(csvLine(['FUEL RECEIVED'])); L.push(csvLine(['Date','Depot','Type','Litres']));
-  R.receipts.forEach(x => L.push(csvLine([x.date, x.depot, x.type, x.litres]))); L.push('');
-  L.push(csvLine(['TRUCK FILL DETAILS'])); L.push(csvLine(['Date','Depot','Truck','Prev km','Curr km','Km','Litres','km/L','Meter broken']));
+  L.push(csvLine(['Capital Bakery - Depot Fuel Report']));
+  if(R.truck) L.push(csvLine(['Truck', R.truck]));
+  L.push(csvLine(['Depot', R.dep||'All depots'])); L.push(csvLine(['Period', (R.from||'start')+' to '+(R.to||'today')])); L.push('');
+  L.push(csvLine(['SUMMARY']));
+  if(R.truck){
+    L.push(csvLine(['Fills', T.n])); L.push(csvLine(['Litres filled', r2(T.filled)])); L.push(csvLine(['Total km', r2(T.km)]));
+    L.push(csvLine(['Average km/L', r2(T.kpl)])); L.push(csvLine(['Best km/L', r2(T.best)])); L.push(csvLine(['Lowest km/L', r2(T.low)])); L.push('');
+  } else {
+    L.push(csvLine(['Brought forward (L)', r2(T.bf)])); L.push(csvLine(['Litres received', r2(T.recv)])); L.push(csvLine(['Litres filled', r2(T.filled)]));
+    L.push(csvLine(['Balance fuel (L)', r2(T.balance)])); L.push(csvLine(['Total km', r2(T.km)])); L.push(csvLine(['Average km/L', r2(T.kpl)])); L.push('');
+    if(!R.dep){ L.push(csvLine(['DEPOT SUMMARY'])); L.push(csvLine(['Depot','B/F','Received','Filled','Km','km/L','Balance']));
+      R.rows.forEach(x => L.push(csvLine([x.depot, r2(x.bf), r2(x.recv), r2(x.filled), r2(x.km), r2(x.kpl), r2(x.balance)]))); L.push(''); }
+    L.push(csvLine(['PER TRUCK'])); L.push(csvLine(['Truck','Fills','Litres','Km','km/L']));
+    R.trucks.forEach(x => L.push(csvLine([x.truck, x.n, r2(x.litres), r2(x.km), r2(x.kpl)]))); L.push('');
+    L.push(csvLine(['FUEL RECEIVED'])); L.push(csvLine(['Date','Depot','Type','Litres']));
+    R.receipts.forEach(x => L.push(csvLine([x.date, x.depot, x.type, x.litres]))); L.push('');
+  }
+  L.push(csvLine([R.truck ? 'FILLS (DATE WISE)' : 'TRUCK FILL DETAILS'])); L.push(csvLine(['Date','Depot','Truck','Prev km','Curr km','Km','Litres','km/L','Meter broken']));
   R.fills.forEach(x => L.push(csvLine([x.date, x.depot, x.truck, x.prev, x.curr, x.km, x.litres, x.kpl, x.meterBroken?'Yes':'No'])));
-  const blob = new Blob(['﻿'+L.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  const blob = new Blob(['\ufeff'+L.join('\r\n')], {type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname('csv'); document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 function exportPDF(){
@@ -655,18 +679,23 @@ function exportPDF(){
   const R = report, T = R.tot, doc = new window.jspdf.jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
   const f1 = n => fmt(n,1), blue = {fillColor:[24,95,165]};
   doc.setFontSize(15); doc.text('Capital Bakery - Depot Fuel Report', 14, 14);
-  doc.setFontSize(10); doc.text('Depot: '+(R.dep||'All depots')+'     Period: '+(R.from||'start')+' to '+(R.to||'today'), 14, 21);
-  doc.autoTable({startY:25, head:[['Brought forward (L)','Litres received','Litres filled','Balance fuel (L)','Total km','Avg km/L']],
-    body:[[f1(T.bf), f1(T.recv), f1(T.filled), f1(T.balance), fmt(T.km,0), T.kpl?T.kpl.toFixed(2):'-']], headStyles:blue, styles:{fontSize:10, halign:'center'}});
-  if(!R.dep){
-    doc.autoTable({startY:doc.lastAutoTable.finalY+6, head:[['Depot','B/F','Received','Filled','Km','km/L','Balance']],
-      body:R.rows.map(x=>[x.depot,f1(x.bf),f1(x.recv),f1(x.filled),fmt(x.km,0),x.kpl?x.kpl.toFixed(2):'-',f1(x.balance)]).concat([['Total',f1(T.bf),f1(T.recv),f1(T.filled),fmt(T.km,0),T.kpl?T.kpl.toFixed(2):'-',f1(T.balance)]]),
-      headStyles:blue, styles:{fontSize:9}, didParseCell:d=>{ if(d.row.index===R.rows.length) d.cell.styles.fontStyle='bold'; }});
+  doc.setFontSize(10); doc.text((R.truck?'Truck: '+R.truck+'     ':'')+'Depot: '+(R.dep||'All depots')+'     Period: '+(R.from||'start')+' to '+(R.to||'today'), 14, 21);
+  if(R.truck){
+    doc.autoTable({startY:25, head:[['Fills','Litres filled','Total km','Avg km/L','Best km/L','Lowest km/L']],
+      body:[[T.n, f1(T.filled), fmt(T.km,0), T.kpl?T.kpl.toFixed(2):'-', T.best!=null?T.best.toFixed(2):'-', T.low!=null?T.low.toFixed(2):'-']], headStyles:blue, styles:{fontSize:10, halign:'center'}});
+  } else {
+    doc.autoTable({startY:25, head:[['Brought forward (L)','Litres received','Litres filled','Balance fuel (L)','Total km','Avg km/L']],
+      body:[[f1(T.bf), f1(T.recv), f1(T.filled), f1(T.balance), fmt(T.km,0), T.kpl?T.kpl.toFixed(2):'-']], headStyles:blue, styles:{fontSize:10, halign:'center'}});
+    if(!R.dep){
+      doc.autoTable({startY:doc.lastAutoTable.finalY+6, head:[['Depot','B/F','Received','Filled','Km','km/L','Balance']],
+        body:R.rows.map(x=>[x.depot,f1(x.bf),f1(x.recv),f1(x.filled),fmt(x.km,0),x.kpl?x.kpl.toFixed(2):'-',f1(x.balance)]).concat([['Total',f1(T.bf),f1(T.recv),f1(T.filled),fmt(T.km,0),T.kpl?T.kpl.toFixed(2):'-',f1(T.balance)]]),
+        headStyles:blue, styles:{fontSize:9}, didParseCell:d=>{ if(d.row.index===R.rows.length) d.cell.styles.fontStyle='bold'; }});
+    }
+    doc.autoTable({startY:doc.lastAutoTable.finalY+6, head:[['Truck','Fills','Litres','Km','km/L']],
+      body:R.trucks.map(x=>[x.truck,x.n,f1(x.litres),fmt(x.km,0),x.kpl?x.kpl.toFixed(2):'-']), headStyles:blue, styles:{fontSize:9}});
+    doc.autoTable({startY:doc.lastAutoTable.finalY+6, head:[['Date','Depot','Type','Litres received']],
+      body:R.receipts.map(x=>[x.date,x.depot,x.type,f1(x.litres)]), headStyles:{fillColor:[46,125,50]}, styles:{fontSize:9}});
   }
-  doc.autoTable({startY:doc.lastAutoTable.finalY+6, head:[['Truck','Fills','Litres','Km','km/L']],
-    body:R.trucks.map(x=>[x.truck,x.n,f1(x.litres),fmt(x.km,0),x.kpl?x.kpl.toFixed(2):'-']), headStyles:blue, styles:{fontSize:9}});
-  doc.autoTable({startY:doc.lastAutoTable.finalY+6, head:[['Date','Depot','Type','Litres received']],
-    body:R.receipts.map(x=>[x.date,x.depot,x.type,f1(x.litres)]), headStyles:{fillColor:[46,125,50]}, styles:{fontSize:9}});
   doc.autoTable({startY:doc.lastAutoTable.finalY+6, head:[['Date','Depot','Truck','Prev km','Curr km','Km','Litres','km/L']],
     body:R.fills.map(x=>[x.date,x.depot,x.truck,x.prev!=null?fmt(x.prev,0):'-',x.curr!=null?fmt(x.curr,0):'-',x.km!=null?fmt(x.km,0):(x.meterBroken?'meter broken':'-'),f1(x.litres),x.kpl!=null?Number(x.kpl).toFixed(2):'-']),
     headStyles:blue, styles:{fontSize:8}});
